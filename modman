@@ -29,6 +29,8 @@ Module Manager (v$version)
 Global Commands:
   $script <command> [<options>]
 ------------------------------
+  config                     create sample config file at your current folder, you can modify it and copy it to where the modman script is for global configuration.
+                              - you can use mmroot (modman root) to centrelise the modman repos for multiple websites. 
   init [basedir] [modmandir] initialize the pwd (or [basedir]) as the modman deploy root
   list [--absolute]          list all valid modules that are currently checked out
   status                     show VCS 'status' command for all modules
@@ -214,17 +216,18 @@ if [ -z "$pager" ]; then
 fi
 
 ###########################
-# Handle "init" command, simply create .modman directory
-if [ "$action" = "init" ]; then
-  basedir=$1
-  [[ -n "$2" ]] &&  modmandir="$2" || modmandir=".modman"
-  [[ -n "$basedir" && ! -d "$basedir" ]] && { echo "$basedir is not a directory."; exit 1; }
-  mkdir "$modmandir" || { echo "Could not create $modmandir directory" && exit 1; }
-  if [ -n "$basedir" ]; then
-    echo "$basedir" > "$modmandir/.basedir"
-    basedir="with basedir at $basedir"
-  fi
-  echo "Initialized Module Manager at $(pwd) $basedir"
+# Handle "--help" command
+if [ "$action" = "config" ]; then
+  cat > .modman.conf << EOL
+  #root=$_pwd
+  #mmroot=$root          # parent of .modman directory
+  #FORCE=0               # --force option off by default
+  #NOLOCAL=0             # --no-local option off by default
+  #NOCLEAN=0             # --no-clean off by default
+  #NOSHELL=0             # --no-shell option off by default
+  #COPY=0                # --copy option off by default
+  #modmandir='.modman'   # --modmandir defaults to .modman
+EOL
   exit 0
 ###########################
 # Handle "--help" command
@@ -723,6 +726,7 @@ get_tracking_branch ()
 mm_not_found="Module Manager directory not found.\nRun \"$script init\" in the root of the project with which you would like to use Module Manager."
 _pwd=$(pwd -P)
 root=$_pwd
+mmroot=$root          # parent of .modman directory
 
 # Check for common option overrides
 FORCE=0               # --force option off by default
@@ -732,6 +736,23 @@ NOSHELL=0             # --no-shell option off by default
 COPY=0                # --copy option off by default
 modmandir='.modman'   # --modmandir defaults to .modman
 basedir=''
+. .modman.conf
+
+###########################
+# Handle "init" command, simply create .modman directory
+if [ "$action" = "init" ]; then
+  basedir=$1
+  [[ -n "$2" ]] &&  modmandir="$2" || modmandir=".modman"
+  [[ -n "$basedir" && ! -d "$basedir" ]] && { echo "$basedir is not a directory."; exit 1; }
+  mkdir -p "$mmroot/$modmandir" || { echo "Could not create $modmandir directory" && exit 1; }
+  if [ -n "$basedir" ]; then
+    echo "$basedir" > "$modmandir/.basedir"
+    basedir="with basedir at $basedir"
+  fi
+  echo "Initialized Module Manager at $(pwd) $basedir"
+  exit 0
+fi
+  
 while true; do
   case "$1" in
     --force)       FORCE=1; shift ;;
@@ -747,7 +768,7 @@ while true; do
       ;;
     --modmandir)
       shift; modmandir="$1"; shift
-      if ! [ -n "$modmandir" -a -d "$root/$modmandir" ]; then
+      if ! [ -n "$modmandir" -a -d "$mmroot/$modmandir" ]; then
         echo "Specified --modmandir does not exist; $modmandir"; exit 1
       fi
       ;;
@@ -757,14 +778,13 @@ done
 
 ################################
 # Store modman parent path in $root
-while ! [ -d "$root/$modmandir" ]; do
-  if [ "$root" = "/" ]; then echo -e $mm_not_found && exit 1; fi
-  cd .. || { error "Could not traverse up from $root\n$mm_not_found" && exit 1; }
-  root=$(pwd)
+while ! [ -d "$mmroot/$modmandir" ]; do
+  if [ "$mmroot" = "/" ]; then echo -e $mm_not_found && exit 1; fi
+  cd "$mmroot/.." || { error "Could not traverse up from $root\n$mm_not_found" && exit 1; }
+  mmroot=$(pwd)
 done
 
-mmroot=$root          # parent of .modman directory
-mm="$root/$modmandir" # path to .modman
+mm="$mmroot/$modmandir" # path to .modman
 
 # Allow a different root to be specified as root for deploying modules, applies to all modules
 newroot=$(get_basedir "$mm")
