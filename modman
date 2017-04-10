@@ -218,7 +218,7 @@ fi
 ###########################
 # Handle "--help" command
 if [ "$action" = "config" ]; then
-  cat > .modman.conf << EOL
+  cat >> .modman.conf << EOL
   #root=$_pwd
   #mmroot=$root          # parent of .modman directory
   #FORCE=0               # --force option off by default
